@@ -8,8 +8,11 @@ package pt_online_schema_change_plugin;
 
 use strict;
 use warnings FATAL => 'all';
+use Data::Dump 'dump';
+
 use English qw(-no_match_vars);
 use constant PTDEBUG => $ENV{PTDEBUG} || 0;
+use constant RAMDISK_DIR => "/dev/shm/mysql";
 
 sub new {
    my ($class, %args) = @_;
@@ -32,18 +35,18 @@ sub after_alter_new_table {
    my $dbh     = $self->{cxn}->dbh;
    my $row = $dbh->selectrow_arrayref("SHOW CREATE TABLE $new_tbl->{name}");
    my $new_tbl_ramdisk = $row->[1];
-   my $dir_option = " DATA DIRECTORY='/dev/shm/mysql/vnw_ads/' INDEX DIRECTORY='/dev/shm/mysql/vnw_ads/'";
-   if (index($new_tbl_ramdisk, $dir_option) == -1) {
-      print "$plugin_name: $new_tbl->{name} is not on Ramdisk\n";
-      $new_tbl_ramdisk = $new_tbl_ramdisk . " DATA DIRECTORY='/dev/shm/mysql/vnw_ads/' INDEX DIRECTORY='/dev/shm/mysql/vnw_ads/'";
+   #dump $new_tbl;
+   my $dir_option = " DATA DIRECTORY='".RAMDISK_DIR."/$new_tbl->{db}/' INDEX DIRECTORY='".RAMDISK_DIR."/$new_tbl->{db}/'";
+   if ((index($new_tbl_ramdisk, $dir_option) == -1) && (lc $new_tbl->{tbl_struct}->{engine} eq "myisam")) {
+      print "$plugin_name: $new_tbl->{name} is not on Ramdisk and is MyISAM: moving to Ramdisk\n";
+      $new_tbl_ramdisk = $new_tbl_ramdisk . $dir_option;
       print "$plugin_name: DROP and CREATE new table on Ramdisk\n $new_tbl_ramdisk\n\n";
       $dbh->do("DROP TABLE IF EXISTS $new_tbl->{name}");
       $dbh->do("$new_tbl_ramdisk");
    } else {
-      print "$plugin_name: $new_tbl->{name} is already on Ramdisk\n";
+      print "$plugin_name: $new_tbl->{name} is already on Ramdisk or not MyISAM\n";
    }
    warn "$plugin_name: DONE\n";
 }
-
 
 1;
