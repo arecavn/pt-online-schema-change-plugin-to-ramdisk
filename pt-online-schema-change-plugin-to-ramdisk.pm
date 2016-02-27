@@ -8,6 +8,7 @@ package pt_online_schema_change_plugin;
 
 use strict;
 use warnings FATAL => 'all';
+use File::Path qw(make_path);
 use Data::Dump 'dump';
 
 use English qw(-no_match_vars);
@@ -39,6 +40,9 @@ sub after_alter_new_table {
    my $dir_option = " DATA DIRECTORY='".RAMDISK_DIR."/$new_tbl->{db}/' INDEX DIRECTORY='".RAMDISK_DIR."/$new_tbl->{db}/'";
    if ((index($new_tbl_ramdisk, $dir_option) == -1) && (lc $new_tbl->{tbl_struct}->{engine} eq "myisam")) {
       print "$plugin_name: $new_tbl->{name} is not on Ramdisk and is MyISAM: moving to Ramdisk\n";
+
+      make_path("$ramdisk_dir_db", {owner=>'mysql', group=>'mysql'});
+
       $new_tbl_ramdisk = $new_tbl_ramdisk . $dir_option;
       print "$plugin_name: DROP and CREATE new table on Ramdisk\n $new_tbl_ramdisk\n\n";
       $dbh->do("DROP TABLE IF EXISTS $new_tbl->{name}");
